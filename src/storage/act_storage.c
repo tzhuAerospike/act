@@ -391,6 +391,11 @@ main(int argc, char* argv[])
 
 		fprintf(stdout, "requests-queued: %" PRIu32 "\n",
 				atomic32_get(g_reqs_queued));
+        
+               if (g_scfg.warning_only_mode && atomic32_get(g_reqs_queued) > 0) {
+                       fprintf(stdout, "WARNING! drive is lagging: %lf sec\n",
+                       (double)atomic32_get(g_reqs_queued) / (double)(g_scfg.read_reqs_per_sec+g_scfg.write_reqs_per_sec));
+               }
 
 		if (do_reads) {
 			histogram_dump(g_read_hist, "reads");

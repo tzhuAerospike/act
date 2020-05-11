@@ -71,6 +71,7 @@ static const char TAG_MAX_REQS_QUEUED[]         = "max-reqs-queued";
 static const char TAG_MAX_LAG_SEC[]             = "max-lag-sec";
 static const char TAG_SCHEDULER_MODE[]          = "scheduler-mode";
 
+static const char TAG_WARNING_ONLY_MODE[]       = "warning-only-mode";
 #define RBLOCK_SIZE 16 // must be power of 2
 
 
@@ -231,6 +232,9 @@ storage_configure(int argc, char* argv[])
 		else if (strcmp(tag, TAG_SCHEDULER_MODE) == 0) {
 			g_scfg.scheduler_mode = parse_scheduler_mode();
 		}
+               else if (strcmp(tag, TAG_WARNING_ONLY_MODE) == 0) {                           
+                       g_scfg.warning_only_mode = parse_yes_no();                                
+               } 
 		else {
 			fprintf(stdout, "ERROR: ignoring unknown config item '%s'\n", tag);
 		}
@@ -439,6 +443,12 @@ derive_configuration()
 		return false;
 	}
 
+       // warning-only-mode 
+       if (g_scfg.warning_only_mode) {
+           g_scfg.max_reqs_queued = (g_scfg.read_reqs_per_sec + g_scfg.write_reqs_per_sec) * g_scfg.run_us / 1000000;
+           g_scfg.max_lag_usec = g_scfg.run_us;
+       }
+
 	return true;
 }
 
@@ -507,6 +517,8 @@ echo_configuration()
 			g_scfg.max_lag_usec / 1000000);
 	fprintf(stdout, "%s: %s\n", TAG_SCHEDULER_MODE,
 			g_scfg.scheduler_mode);
+       fprintf(stdout, "%s: %s\n", TAG_WARNING_ONLY_MODE,                                
+                       g_scfg.warning_only_mode ? "yes" : "no");
 
 	fprintf(stdout, "\nDERIVED CONFIGURATION\n");
 

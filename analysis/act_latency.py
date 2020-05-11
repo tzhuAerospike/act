@@ -55,6 +55,7 @@ class Args(object):
     num_buckets = 7
     every_nth = 1
     extra = False
+    lag = False
 
 
 class Hist(object):
@@ -79,7 +80,9 @@ class Hist(object):
         self.overs = [0.0] * Hist.max_bucket
         self.avg_overs = [0.0] * Hist.max_bucket
         self.max_overs = [0.0] * Hist.max_bucket
-
+        self.lag_time = 0.0
+        self.avg_lag = 0.0
+        self.max_lag = 0.0
 
 # ==========================================================
 # Main.
@@ -110,9 +113,9 @@ def get_args():
     # Read the input arguments:
     try:
         opts, args = getopt.getopt(
-            sys.argv[1:], "l:h:t:s:n:e:x",
+            sys.argv[1:], "l:h:t:s:n:e:xg",
             ["log=", "histogram=", "slice=", "start_bucket=", "num_buckets=",
-             "every_nth=", "extra"])
+             "every_nth=", "extra", "lag"])
     except getopt.GetoptError as err:
         print(str(err))
         print_usage()
@@ -134,6 +137,8 @@ def get_args():
             Args.every_nth = int(a)
         elif o == "-x" or o == "--extra":
             Args.extra = True
+        elif o == "-g" or o == "--lag":
+            Args.lag = True
 
     # Sanity-check the arguments:
     if Args.log is None:
@@ -177,6 +182,8 @@ def print_usage():
     print("    default: 1")
     print(" -x (show extra information for each slice)")
     print("    default: not set")
+    print(" -g (show SSD lag information for each slice)")                        
+    print("    default: not set")  
 
 
 # ------------------------------------------------
@@ -346,6 +353,9 @@ def print_table_header(hists):
     if Args.extra:
         threshold_labels += "       rate"
         threshold_underline += " ----------"
+    if Args.lag:                                                              
+        threshold_labels += "       lag time"                                   
+        threshold_underline += " --------------"
 
     len_table = len(threshold_labels)
 
@@ -407,6 +417,9 @@ def print_latency_aggregates(hists, num_slices):
     for hist in hists:
         if Args.extra:
             hist.avg_rate /= num_slices
+        
+        if Args.lag:
+            hist.avg_lag /= num_slices
 
         for i in Hist.display_range:
             hist.avg_overs[i] /= num_slices
@@ -441,6 +454,12 @@ def read_chunk(file_id, after_time, hists):
                 got_chunk = True
                 break
         else:
+            if Args.lag:
+                for hist in hists: 
+                    matchObj = re.match( r'.* lagging: (\d+\.\d+) sec', line);
+                    if matchObj:
+                        #print ("-->", matchObj.group(1));
+                        hist.lag_time = float(matchObj.group(1));
             line = file_id.readline()
 
     return got_chunk
@@ -460,6 +479,10 @@ def print_slice_line(slice_tag, hists):
 
         if Args.extra:
             output += "%11.1f" % (hist.rate)
+        
+        if Args.lag:
+            output += "%15.3f" % (hist.lag_time)
+            hist.lag_time /= slice_tag
 
     print(output)
 
@@ -478,6 +501,9 @@ def print_avg_line(hists):
 
         if Args.extra:
             output += "%11.1f" % (hist.avg_rate)
+        
+        if Args.lag:
+            output += "%15.3f" % (hist.avg_lag)
 
     print(output)
 
@@ -496,6 +522,9 @@ def print_max_line(hists):
 
         if Args.extra:
             output += "%11.1f" % (hist.max_rate)
+        
+        if Args.lag:
+            output += "%15.3f" % (hist.max_lag)
 
     print(output)
 
@@ -572,6 +601,12 @@ def bucket_aggregations(hist):
 
         if hist.rate > hist.max_rate:
             hist.max_rate = hist.rate
+    
+    if Args.lag:
+        hist.avg_lag += hist.lag_time;
+
+        if hist.lag_time > hist.max_lag:
+            hist.max_lag = hist.lag_time
 
     for i in Hist.display_range:
         hist.avg_overs[i] += hist.overs[i]
