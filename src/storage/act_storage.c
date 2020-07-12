@@ -261,7 +261,8 @@ main(int argc, char* argv[])
 		for (uint32_t n = 0; n < g_scfg.num_devices; n++) {
 			device* dev = &g_devices[n];
 
-			if (pthread_create(&dev->large_block_read_thread, NULL,
+			if (!g_scfg.disable_large_block_read && 
+                pthread_create(&dev->large_block_read_thread, NULL,
 					run_large_block_reads, (void*)dev) != 0) {
 				printf("ERROR: create large op read thread\n");
 				exit(-1);
@@ -396,7 +397,8 @@ main(int argc, char* argv[])
 		}
 
 		if (g_scfg.write_reqs_per_sec != 0) {
-			pthread_join(dev->large_block_read_thread, NULL);
+            if (!g_scfg.disable_large_block_read)
+			    pthread_join(dev->large_block_read_thread, NULL);
 			pthread_join(dev->large_block_write_thread, NULL);
 		}
 

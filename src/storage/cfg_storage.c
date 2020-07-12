@@ -67,8 +67,7 @@ static const char TAG_TOMB_RAIDER[]             = "tomb-raider";
 static const char TAG_TOMB_RAIDER_SLEEP_USEC[]  = "tomb-raider-sleep-usec";
 static const char TAG_MAX_LAG_SEC[]             = "max-lag-sec";
 static const char TAG_SCHEDULER_MODE[]          = "scheduler-mode";
-
-static const char TAG_WARNING_ONLY_MODE[]       = "warning-only-mode";
+static const char TAG_DISABLE_LARGE_BLOCK_READ[]= "disable-large-block-read";
 #define RBLOCK_SIZE 16 // must be power of 2
 
 
@@ -217,9 +216,9 @@ storage_configure(int argc, char* argv[])
 		else if (strcmp(tag, TAG_SCHEDULER_MODE) == 0) {
 			g_scfg.scheduler_mode = parse_scheduler_mode();
 		}
-               else if (strcmp(tag, TAG_WARNING_ONLY_MODE) == 0) {                           
-                       g_scfg.warning_only_mode = parse_yes_no();                                
-               } 
+        else if (strcmp(tag, TAG_DISABLE_LARGE_BLOCK_READ) == 0) {
+            g_scfg.disable_large_block_read = parse_yes_no(); 
+        }
 		else {
 			printf("ERROR: ignoring unknown config item '%s'\n", tag);
 			return false;
@@ -378,6 +377,12 @@ derive_configuration()
 		g_scfg.large_block_writes_per_sec = g_scfg.large_block_reads_per_sec;
 	}
 
+    if (g_scfg.disable_large_block_read) {
+        g_scfg.internal_read_reqs_per_sec += g_scfg.large_block_reads_per_sec /
+                    (g_scfg.large_block_ops_bytes / avg_record_stored_bytes);
+        g_scfg.large_block_reads_per_sec = 0;
+    }
+
 	// Non-zero load must be enough to calculate service thread rates safely.
 	uint32_t total_reqs_per_sec =
 			g_scfg.internal_read_reqs_per_sec +
@@ -388,12 +393,6 @@ derive_configuration()
 		printf("ERROR: load config too small\n");
 		return false;
 	}
-
-       // warning-only-mode 
-       if (g_scfg.warning_only_mode) {
-           g_scfg.max_reqs_queued = (g_scfg.read_reqs_per_sec + g_scfg.write_reqs_per_sec) * g_scfg.run_us / 1000000;
-           g_scfg.max_lag_usec = g_scfg.run_us;
-       }
 
 	return true;
 }
@@ -456,8 +455,8 @@ echo_configuration()
 			g_scfg.max_lag_usec / 1000000);
 	printf("%s: %s\n", TAG_SCHEDULER_MODE,
 			g_scfg.scheduler_mode);
-       fprintf(stdout, "%s: %s\n", TAG_WARNING_ONLY_MODE,                                
-                       g_scfg.warning_only_mode ? "yes" : "no");
+    printf("%s: %s\n", TAG_DISABLE_LARGE_BLOCK_READ,                                      
+            g_scfg.disable_large_block_read ? "yes" : "no");
 
 	printf("\nDERIVED CONFIGURATION\n");
 
